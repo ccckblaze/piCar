@@ -14,7 +14,7 @@ from flask import Flask, request, session, g, redirect, url_for, abort, render_t
 from contextlib import closing
 from pi_car import app
 import re
-import RPi.GPIO as GPIO
+import controller
 @app.route('/')
 def show_index():
 	return render_template('home.html')
@@ -30,58 +30,21 @@ def login():
 def ctrl_id():
 	if request.method == 'POST':
 		id=request.form['id']
-		GPIO.setmode(GPIO.BOARD)
-		GPIO.setwarnings(False)
-		GPIO.setup(11,GPIO.OUT)
-		GPIO.setup(12,GPIO.OUT)
-		GPIO.setup(15,GPIO.OUT)
-		GPIO.setup(16,GPIO.OUT)
-
+		
 		if id == 't_left':
-			t_left()
+			controller.t_left()
 			return "left"
 		elif id == 't_right':
-			t_right()
+			controller.t_right()
 			return "right"
 		elif id == 't_up':
-			t_up()
+			controller.t_forward()
 			return "up"
 		elif id == 't_down':
-			t_down()
+			controller.t_backward()
 			return "down"
 		elif id == 't_stop':
-			t_stop()
+			controller.t_stop()
 			return "stop"
 
 	return redirect(url_for('show_index'))
-
-def t_stop():
-	GPIO.output(11, False)
-	GPIO.output(12, False)
-	GPIO.output(15, False)
-	GPIO.output(16, False)
-
-def t_up():
-	GPIO.output(11, True)
-	GPIO.output(12, False)
-	GPIO.output(15, True)
-	GPIO.output(16, False)
-
-def t_down():
-	GPIO.output(11, False)
-	GPIO.output(12, True)
-	GPIO.output(15, False)
-	GPIO.output(16, True)
-
-def t_left():
-	GPIO.output(11, False)
-	GPIO.output(12, True)
-	GPIO.output(15, True)
-	GPIO.output(16, False)
-
-def t_right():
-	GPIO.output(11, True)
-	GPIO.output(12, False)
-	GPIO.output(15, False)
-	GPIO.output(16, True)
-

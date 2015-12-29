@@ -18,6 +18,7 @@ class Config(object):
   USERNAME = 'admin'
   PASSWORD = 'default'
   DEBUG = True
+  USE_RELOADER = False
   HOST = '0.0.0.0'
   PORT = 2000
 class Development(Config):
