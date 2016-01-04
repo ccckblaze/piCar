@@ -13,8 +13,15 @@
 from flask import Flask, request, session, g, redirect, url_for, abort, render_template, flash
 from contextlib import closing
 from pi_car import app
-import re
-import controller
+from controller import Car
+
+@app.before_first_request
+def initialize():
+	print('initialize')
+	global car
+	car = Car()
+	car.setSpeed(80)
+
 @app.route('/')
 def show_index():
 	return render_template('home.html')
@@ -32,19 +39,19 @@ def ctrl_id():
 		id=request.form['id']
 		
 		if id == 't_left':
-			controller.t_left()
+			car.left()
 			return "left"
 		elif id == 't_right':
-			controller.t_right()
+			car.right()
 			return "right"
 		elif id == 't_up':
-			controller.t_forward()
+			car.forward()
 			return "up"
 		elif id == 't_down':
-			controller.t_backward()
+			car.backward()
 			return "down"
 		elif id == 't_stop':
-			controller.t_stop()
+			car.stop()
 			return "stop"
 
 	return redirect(url_for('show_index'))
