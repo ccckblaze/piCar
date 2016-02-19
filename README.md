@@ -1,6 +1,7 @@
 # My Pi Car
 ===============================
-Author: Hanxiaoxu (based on WangHeng's work - Blog: http://wangheng.org)
+Author: Hanxiaoxu 
+        (based on WangHeng's work - Blog: http://wangheng.org)
 
 #### LISENSE:GPL
 ===============================
