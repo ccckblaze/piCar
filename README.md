@@ -1,14 +1,11 @@
 # My Pi Car
 ===============================
-Author: WangHeng
+Author: Hanxiaoxu (based on WangHeng's work - Blog: http://wangheng.org)
 
-Blog: http://wangheng.org
 #### LISENSE:GPL
 ===============================
 User Guide:
 
-
 > sudo python server.py 
-
 
 then visit Pi_IP:2000
