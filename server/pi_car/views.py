@@ -20,7 +20,7 @@ def initialize():
 	print('initialize')
 	global car
 	car = Car()
-	car.setSpeed(80)
+	car.setSpeed(100)
 
 @app.route('/')
 def show_index():
