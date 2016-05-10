@@ -3,7 +3,7 @@ import smbus
 import logging
 import atexit
 import time
-import threading
+from threading import Thread, Timer
 
 #Use I2C or origin GPIO Ports
 USE_I2C = True
@@ -22,7 +22,7 @@ init = False
 
 def threaded(fn):
 	def wrapper(*args, **kwargs):
-	        threading.Thread(target=fn, args=args, kwargs=kwargs).start()
+	        Thread(target=fn, args=args, kwargs=kwargs).start()
 	return wrapper
 
 def t_init():
@@ -97,6 +97,9 @@ class Servo(object):
 	
 	def destroy(self):
 		self.running = False
+                while(self.looping):
+                        #print('waitting', self.looping)
+                        self.running = False
 
 	def setAngle(self, angle):
 		self.angle = angle
@@ -104,17 +107,24 @@ class Servo(object):
         @threaded
 	def servo_loop(self):
 		while(self.running):
-       		        for i in range(0,181,10):
-                	        self.pwm_ch.ChangeDutyCycle(2.5 + 10 * i / 180) # Angle Speed
-                                time.sleep(0.02)                                # 20ms
-	                        #self.pwm_ch.ChangeDutyCycle(0)                 # Back to zero 
-				#time.sleep(0.2)
+                        self.looping = True
+
+                        try:
+       		                for i in range(0,181,10):
+                	                self.pwm_ch.ChangeDutyCycle(2.5 + 10 * i / 180) # Angle Speed
+                                        time.sleep(0.02)                                # 20ms
+	                                #self.pwm_ch.ChangeDutyCycle(0)                 # Back to zero 
+			          	#time.sleep(0.2)
 		     
-                        for i in range(181,0,-10):
-                                self.pwm_ch.ChangeDutyCycle(2.5 + 10 * i / 180)
-	                        time.sleep(0.02)
-                                #self.pwm_ch.ChangeDutyCycle(0)
-	                        #time.sleep(0.2)
+                                for i in range(181,0,-10):
+                                        self.pwm_ch.ChangeDutyCycle(2.5 + 10 * i / 180)
+	                                time.sleep(0.02)
+                                        #self.pwm_ch.ChangeDutyCycle(0)
+	                                #time.sleep(0.2)
+                        except (AttributeError, TypeError):
+                                print('Exception exit') # caused by time.sleep
+
+                self.looping = False
 
 class Car(object):
 	
@@ -123,7 +133,8 @@ class Car(object):
         forwarding = False
 	turningLeft = False
 	turningRight = False
-	
+        destroyed = False
+        
 	def __init__(self):
 		logging.debug('Car init')
 		t_init()
@@ -134,8 +145,21 @@ class Car(object):
 		self.camara_servo = Servo(GPIO_CAMARA_SERVO)
 
 	def __del__(self):
+                self.destroyed = True
 		print('Car destroyed')
-		self.camara_servo.destroy()
+		if hasattr(self, 'timer'):
+                        self.timer.cancel()
+                        self.join()
+                        self.timer = None
+                self.camara_servo.destroy()
+
+        def timeout(self):
+            try:
+                print('timeout')
+                if not self.destroyed:
+                        self.stop() 
+            except (AttributeError, TypeError):
+                print('Exception exit')
 
         def forward(self):
                 self.forwarding = True 
@@ -146,6 +170,7 @@ class Car(object):
 		self.wheel_back_left.forward()
 		self.wheel_back_right.forward()
 		self.updateSpeed()
+                self.setTimeout()
 
         def backward(self):
                 self.forwarding = False
@@ -156,6 +181,7 @@ class Car(object):
 		self.wheel_back_left.backward()
 		self.wheel_back_right.backward()
 		self.updateSpeed()
+                self.setTimeout()
 
         def left(self):
                 self.forwarding = False
@@ -166,6 +192,7 @@ class Car(object):
 		self.wheel_back_left.backward()
 		self.wheel_back_right.forward()
 		self.updateSpeed()
+                self.setTimeout()
 
 	def right(self):
                 self.forwarding = False
@@ -176,11 +203,21 @@ class Car(object):
 		self.wheel_back_left.forward()
 		self.wheel_back_right.backward()
 		self.updateSpeed()
+                self.setTimeout()
 
 	def setSpeed(self, speed):
 		self.speed = speed
 		self.updateSpeed()
-		
+	
+        def setTimeout(self):
+                if hasattr(self, 'timer'):
+                        self.timer.cancel()
+                        self.timer.join()
+
+                #self.timer = Timer(5, self.timeout)
+                #self.timer.start()
+
+	
 	def updateSpeed(self):
                 currentSpeed = self.speed * 0.5 if self.forwarding else self.speed 
 		self.wheel_front_left.setSpeed(
