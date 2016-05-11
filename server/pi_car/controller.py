@@ -122,7 +122,8 @@ class Servo(object):
                     #self.pwm_ch.ChangeDutyCycle(0)
                     #time.sleep(0.2)
             except (AttributeError, TypeError):
-                print('Exception exit') # caused by time.sleep
+                pass
+                #print('Exception exit') # caused by time.sleep
 
         self.looping = False
 
@@ -147,10 +148,6 @@ class Car(object):
     def __del__(self):
         self.destroyed = True
         print('Car destroyed')
-        if hasattr(self, 'timer'):
-            self.timer.cancel()
-            self.timer.join()
-            self.timer = None
         self.camara_servo.destroy()
 
     def timeout(self):
@@ -210,13 +207,13 @@ class Car(object):
         self.updateSpeed()
         
     def setTimeout(self):
-        if hasattr(self, 'timer'):
-            self.timer.cancel()
-            self.timer.join()
-            self.timer = None
-        #self.timer = Timer(5, self.timeout)
-        #self.timer.start()
-
+        global timer
+        if 'timer' in globals():
+            timer.cancel()
+            timer.join()
+            #timer = None
+        timer = Timer(5, self.timeout)
+        timer.start()
         
     def updateSpeed(self):
         currentSpeed = self.speed * 0.5 if self.forwarding else self.speed 
