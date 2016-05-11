@@ -21,220 +21,219 @@ GPIO_CAMARA_SERVO = 29
 init = False
 
 def threaded(fn):
-	def wrapper(*args, **kwargs):
-	        Thread(target=fn, args=args, kwargs=kwargs).start()
-	return wrapper
+    def wrapper(*args, **kwargs):
+        Thread(target=fn, args=args, kwargs=kwargs).start()
+    return wrapper
 
 def t_init():
-	global init
-	if init == False:
-		logging.debug('init')
-		GPIO.setmode(GPIO.BOARD)
-		GPIO.setwarnings(True)
-		if USE_I2C:
-			logging.debug('Using I2C')
-		init = True
+    global init
+    if init == False:
+        logging.debug('init')
+        GPIO.setmode(GPIO.BOARD)
+        GPIO.setwarnings(True)
+        if USE_I2C:
+            logging.debug('Using I2C')
+            init = True
 
 
 def t_cleanup():
-	global init
-	if init == True:
-		print('cleanup')
-        	GPIO.cleanup()
+    global init
+    if init == True:
+        print('cleanup')
+        GPIO.cleanup()
 
 atexit.register(t_cleanup)
 
 class Wheel(object):
-	
-        PWM_FREQUENCY = 50
+        
+    PWM_FREQUENCY = 50
 
-	def __init__(self, direction_io, pwm_io):
-		logging.debug('Wheel init: ' + str(direction_io) + ', ' + str(pwm_io))
-		t_init()
-		self.dir_io = direction_io
-		GPIO.setup(self.dir_io, GPIO.OUT)
+    def __init__(self, direction_io, pwm_io):
+        logging.debug('Wheel init: ' + str(direction_io) + ', ' + str(pwm_io))
+        t_init()
+        self.dir_io = direction_io
+        GPIO.setup(self.dir_io, GPIO.OUT)
 
-		self.pwm_io = pwm_io
-                GPIO.setup(self.pwm_io, GPIO.OUT)
-		self.pwm_ch = GPIO.PWM(self.pwm_io, self.PWM_FREQUENCY)
-		self.pwm_ch.start(0)
+        self.pwm_io = pwm_io
+        GPIO.setup(self.pwm_io, GPIO.OUT)
+        self.pwm_ch = GPIO.PWM(self.pwm_io, self.PWM_FREQUENCY)
+        self.pwm_ch.start(0)
 
-	def __del__(self):
-		print('Wheel destroryed')
-		#self.pwm_ch.stop()
-		
-	def forward(self):
-		GPIO.output(self.dir_io, True)
+    def __del__(self):
+        print('Wheel destroryed')
+        #self.pwm_ch.stop()
+                
+    def forward(self):
+        GPIO.output(self.dir_io, True)
 
-	def backward(self):
-		GPIO.output(self.dir_io, False)
+    def backward(self):
+        GPIO.output(self.dir_io, False)
 
-        def setSpeed(self, speed):
-		self.pwm_ch.ChangeDutyCycle(speed)
+    def setSpeed(self, speed):
+        self.pwm_ch.ChangeDutyCycle(speed)
 
-        def stop(self):
-		self.setSpeed(0)
+    def stop(self):
+        self.setSpeed(0)
 
 class Servo(object):
-	
-	PWM_FREQUENCY = 50
+        
+    PWM_FREQUENCY = 50
+    destroyed = False
 
-        def __init__(self, pwm_io):
-	        logging.debug('Servo init: ' + str(pwm_io))
-	        t_init()
+    def __init__(self, pwm_io):
+        logging.debug('Servo init: ' + str(pwm_io))
+        t_init()
 
-                self.pwm_io = pwm_io
-                GPIO.setup(self.pwm_io, GPIO.OUT)
-                self.pwm_ch = GPIO.PWM(self.pwm_io, self.PWM_FREQUENCY)
-                self.pwm_ch.start(0)
-		
-		self.running = True
-		self.servo_loop()
-	
-        def __del__(self):
-		print('Servo destroryed')
-		#self.pwm_ch.stop()
-	
-	def destroy(self):
-		self.running = False
-                while(self.looping):
-                        #print('waitting', self.looping)
-                        self.running = False
+        self.pwm_io = pwm_io
+        GPIO.setup(self.pwm_io, GPIO.OUT)
+        self.pwm_ch = GPIO.PWM(self.pwm_io, self.PWM_FREQUENCY)
+        self.pwm_ch.start(0)
+                
+        self.servo_loop()
+        
+    def __del__(self):
+        print('Servo destroryed')
+        #self.pwm_ch.stop()
+       
+    def destroy(self):
+        self.destroyed = True
+        while(self.looping):
+            pass
+            #print('waitting', self.looping)
 
-	def setAngle(self, angle):
-		self.angle = angle
+    def setAngle(self, angle):
+        self.angle = angle
 
-        @threaded
-	def servo_loop(self):
-		while(self.running):
-                        self.looping = True
+    @threaded
+    def servo_loop(self):
+        while(not self.destroyed):
+            self.looping = True
 
-                        try:
-       		                for i in range(0,181,10):
-                	                self.pwm_ch.ChangeDutyCycle(2.5 + 10 * i / 180) # Angle Speed
-                                        time.sleep(0.02)                                # 20ms
-	                                #self.pwm_ch.ChangeDutyCycle(0)                 # Back to zero 
-			          	#time.sleep(0.2)
-		     
-                                for i in range(181,0,-10):
-                                        self.pwm_ch.ChangeDutyCycle(2.5 + 10 * i / 180)
-	                                time.sleep(0.02)
-                                        #self.pwm_ch.ChangeDutyCycle(0)
-	                                #time.sleep(0.2)
-                        except (AttributeError, TypeError):
-                                print('Exception exit') # caused by time.sleep
+            try:
+                for i in range(0,181,10):
+                    self.pwm_ch.ChangeDutyCycle(2.5 + 10 * i / 180) # Angle Speed
+                    time.sleep(0.02)                                # 20ms
+                    #self.pwm_ch.ChangeDutyCycle(0)                 # Back to zero 
+                    #time.sleep(0.2)
+                     
+                for i in range(181,0,-10):
+                    self.pwm_ch.ChangeDutyCycle(2.5 + 10 * i / 180)
+                    time.sleep(0.02)
+                    #self.pwm_ch.ChangeDutyCycle(0)
+                    #time.sleep(0.2)
+            except (AttributeError, TypeError):
+                print('Exception exit') # caused by time.sleep
 
-                self.looping = False
+        self.looping = False
 
 class Car(object):
-	
-	speed = 0
-	decreeseFactor = 0.2
-        forwarding = False
-	turningLeft = False
-	turningRight = False
-        destroyed = False
         
-	def __init__(self):
-		logging.debug('Car init')
-		t_init()
-		self.wheel_front_left = Wheel(GPIO_FRONT_LEFT_DIR, GPIO_FRONT_LEFT_PWM)
-		self.wheel_front_right = Wheel(GPIO_FRONT_RIGHT_DIR, GPIO_FRONT_RIGHT_PWM)
-		self.wheel_back_left = Wheel(GPIO_BACK_LEFT_DIR, GPIO_BACK_LEFT_PWM)
-		self.wheel_back_right = Wheel(GPIO_BACK_RIGHT_DIR, GPIO_BACK_RIGHT_PWM)
-		self.camara_servo = Servo(GPIO_CAMARA_SERVO)
+    speed = 0
+    decreeseFactor = 0.2
+    forwarding = False
+    turningLeft = False
+    turningRight = False
+    destroyed = False
+        
+    def __init__(self):
+        logging.debug('Car init')
+        t_init()
+        self.wheel_front_left = Wheel(GPIO_FRONT_LEFT_DIR, GPIO_FRONT_LEFT_PWM)
+        self.wheel_front_right = Wheel(GPIO_FRONT_RIGHT_DIR, GPIO_FRONT_RIGHT_PWM)
+        self.wheel_back_left = Wheel(GPIO_BACK_LEFT_DIR, GPIO_BACK_LEFT_PWM)
+        self.wheel_back_right = Wheel(GPIO_BACK_RIGHT_DIR, GPIO_BACK_RIGHT_PWM)
+        self.camara_servo = Servo(GPIO_CAMARA_SERVO)
 
-	def __del__(self):
-                self.destroyed = True
-		print('Car destroyed')
-		if hasattr(self, 'timer'):
-                        self.timer.cancel()
-                        self.join()
-                        self.timer = None
-                self.camara_servo.destroy()
+    def __del__(self):
+        self.destroyed = True
+        print('Car destroyed')
+        if hasattr(self, 'timer'):
+            self.timer.cancel()
+            self.timer.join()
+            self.timer = None
+        self.camara_servo.destroy()
 
-        def timeout(self):
-            try:
-                print('timeout')
-                if not self.destroyed:
-                        self.stop() 
-            except (AttributeError, TypeError):
-                print('Exception exit')
+    def timeout(self):
+        try:
+            print('timeout')
+            if not self.destroyed:
+                self.stop() 
+        except (AttributeError, TypeError):
+            print('Exception exit')
 
-        def forward(self):
-                self.forwarding = True 
-		self.turningLeft = False
-		self.turningRight = False
-		self.wheel_front_left.forward()
-		self.wheel_front_right.forward()
-		self.wheel_back_left.forward()
-		self.wheel_back_right.forward()
-		self.updateSpeed()
-                self.setTimeout()
+    def forward(self):
+        self.forwarding = True 
+        self.turningLeft = False
+        self.turningRight = False
+        self.wheel_front_left.forward()
+        self.wheel_front_right.forward()
+        self.wheel_back_left.forward()
+        self.wheel_back_right.forward()
+        self.updateSpeed()
+        self.setTimeout()
 
-        def backward(self):
-                self.forwarding = False
-		self.turningLeft = False
-		self.turningRight = False
-		self.wheel_front_left.backward()
-		self.wheel_front_right.backward()
-		self.wheel_back_left.backward()
-		self.wheel_back_right.backward()
-		self.updateSpeed()
-                self.setTimeout()
+    def backward(self):
+        self.forwarding = False
+        self.turningLeft = False
+        self.turningRight = False
+        self.wheel_front_left.backward()
+        self.wheel_front_right.backward()
+        self.wheel_back_left.backward()
+        self.wheel_back_right.backward()
+        self.updateSpeed()
+        self.setTimeout()
 
-        def left(self):
-                self.forwarding = False
-		self.turningLeft = True
-		self.turningRight = False
-		self.wheel_front_left.backward()
-		self.wheel_front_right.forward()
-		self.wheel_back_left.backward()
-		self.wheel_back_right.forward()
-		self.updateSpeed()
-                self.setTimeout()
+    def left(self):
+        self.forwarding = False
+        self.turningLeft = True
+        self.turningRight = False
+        self.wheel_front_left.backward()
+        self.wheel_front_right.forward()
+        self.wheel_back_left.backward()
+        self.wheel_back_right.forward()
+        self.updateSpeed()
+        self.setTimeout()
 
-	def right(self):
-                self.forwarding = False
-		self.turningLeft = False
-		self.turningRight = True
-		self.wheel_front_left.forward()
-		self.wheel_front_right.backward()
-		self.wheel_back_left.forward()
-		self.wheel_back_right.backward()
-		self.updateSpeed()
-                self.setTimeout()
+    def right(self):
+        self.forwarding = False
+        self.turningLeft = False
+        self.turningRight = True
+        self.wheel_front_left.forward()
+        self.wheel_front_right.backward()
+        self.wheel_back_left.forward()
+        self.wheel_back_right.backward()
+        self.updateSpeed()
+        self.setTimeout()
 
-	def setSpeed(self, speed):
-		self.speed = speed
-		self.updateSpeed()
-	
-        def setTimeout(self):
-                if hasattr(self, 'timer'):
-                        self.timer.cancel()
-                        self.timer.join()
+    def setSpeed(self, speed):
+        self.speed = speed
+        self.updateSpeed()
+        
+    def setTimeout(self):
+        if hasattr(self, 'timer'):
+            self.timer.cancel()
+            self.timer.join()
+            self.timer = None
+        #self.timer = Timer(5, self.timeout)
+        #self.timer.start()
 
-                #self.timer = Timer(5, self.timeout)
-                #self.timer.start()
+        
+    def updateSpeed(self):
+        currentSpeed = self.speed * 0.5 if self.forwarding else self.speed 
+        self.wheel_front_left.setSpeed(
+            self.decreeseFactor * currentSpeed if self.turningLeft else currentSpeed)
+        self.wheel_front_right.setSpeed(
+            self.decreeseFactor * currentSpeed if self.turningRight else currentSpeed)
+        self.wheel_back_left.setSpeed(
+            self.decreeseFactor * currentSpeed if self.turningLeft else currentSpeed)
+        self.wheel_back_right.setSpeed(
+            self.decreeseFactor * currentSpeed if self.turningRight else currentSpeed)
 
-	
-	def updateSpeed(self):
-                currentSpeed = self.speed * 0.5 if self.forwarding else self.speed 
-		self.wheel_front_left.setSpeed(
-				self.decreeseFactor * currentSpeed if self.turningLeft else currentSpeed)
-		self.wheel_front_right.setSpeed(
-				self.decreeseFactor * currentSpeed if self.turningRight else currentSpeed)
-		self.wheel_back_left.setSpeed(
-				self.decreeseFactor * currentSpeed if self.turningLeft else currentSpeed)
-		self.wheel_back_right.setSpeed(
-				self.decreeseFactor * currentSpeed if self.turningRight else currentSpeed)
-
-	def stop(self):
-		self.turningLeft = False
-		self.turningRight = False
-		self.wheel_front_left.stop()
-		self.wheel_front_right.stop()
-		self.wheel_back_left.stop()
-		self.wheel_back_right.stop()
-
+    def stop(self):
+        self.turningLeft = False
+        self.turningRight = False
+        self.wheel_front_left.stop()
+        self.wheel_front_right.stop()
+        self.wheel_back_left.stop()
+        self.wheel_back_right.stop()
 
