@@ -47,7 +47,15 @@ def login():
 def ctrl_id():
     if request.method == 'POST':
         id=request.form['id']
-        if id == 't_left':
+        if id == 'c_left':
+            print('camera left')
+            car.cameraLeft()
+            return "camara left"
+        elif id == 'c_right':
+            print('camera right')
+            car.cameraRight()
+            return "camera right"
+        elif id == 't_left':
             print('left')
             car.left()
             return "left"

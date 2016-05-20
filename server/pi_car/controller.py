@@ -4,6 +4,7 @@ import logging
 import atexit
 import time
 import thread
+from enum import Enum
 from threading import Thread, Timer
 
 #Use I2C or origin GPIO Ports
@@ -19,7 +20,7 @@ GPIO_BACK_LEFT_DIR = 15
 GPIO_BACK_LEFT_PWM = 16
 GPIO_BACK_RIGHT_DIR = 18
 GPIO_BACK_RIGHT_PWM = 22
-GPIO_CAMARA_SERVO = 29
+GPIO_CAMERA_SERVO = 29
 
 init = False
 def threaded(fn):
@@ -108,6 +109,8 @@ class Servo(object):
     PWM_FREQUENCY = 50
     destroyed = False
 
+    degree = 90
+
     class ServoLoopThread(Thread):
         def __init__(self, owner):
             self.owner = owner 
@@ -115,19 +118,13 @@ class Servo(object):
             Thread.__init__(self)
 
         def run(self):
+            prevDegree = self.owner.degree
             while not self.thread_stop:
                 try:
-                    for i in range(0,181,10):
-                        self.owner.pwm_ch.ChangeDutyCycle(2.5 + 10 * i / 180) # Angle Speed
-                        time.sleep(0.02)                                # 20ms
-                        #self.owner.pwm_ch.ChangeDutyCycle(0)                 # Back to zero 
-                        #time.sleep(0.2)
-                     
-                    for i in range(181,0,-10):
-                        self.owner.pwm_ch.ChangeDutyCycle(2.5 + 10 * i / 180)
-                        time.sleep(0.02)
-                        #self.owner.pwm_ch.ChangeDutyCycle(0)
-                        #time.sleep(0.2)
+                    if not prevDegree == self.owner.degree:
+                        self.owner.pwm_ch.ChangeDutyCycle(2.5 + 10 * self.owner.degree / 180) # Angle Speed
+                        prevDegree = self.owner.degree
+                    time.sleep(0.5)
                 except (AttributeError, TypeError):
                     print('Exception exit')
 
@@ -157,21 +154,31 @@ class Servo(object):
         self.servoLoopThread = None
         self.pwm_ch.stop()
 
-    def setAngle(self, angle):
-        self.angle = angle
+    def setDegree(self, degree):
+        if degree >= 0 and degree <= 180:
+            self.degree = degree
+        else:
+            logging.debug('degree not valid')
+
+class Direction(Enum):
+
+    none = 0
+    forward = 1
+    backward = 2
+    left = 3
+    right = 4
 
 class Car(object):
         
+    CAMERA_SERVO_DEGRE_DELTA = 10
     TIMEOUT = 5
     destroyed = False
 
     checkTimeout = False
     commandTiming = 0
     speed = 0
-    decreeseFactor = 0.2
-    forwarding = False
-    turningLeft = False
-    turningRight = False
+    stoped = True
+    direction = Direction.none
 
     class DetectLoopThread(Thread):
         def __init__(self, owner):
@@ -207,7 +214,7 @@ class Car(object):
         self.wheel_front_right = Wheel(GPIO_FRONT_RIGHT_DIR, GPIO_FRONT_RIGHT_PWM)
         self.wheel_back_left = Wheel(GPIO_BACK_LEFT_DIR, GPIO_BACK_LEFT_PWM)
         self.wheel_back_right = Wheel(GPIO_BACK_RIGHT_DIR, GPIO_BACK_RIGHT_PWM)
-        self.camara_servo = Servo(GPIO_CAMARA_SERVO)
+        self.camera_servo = Servo(GPIO_CAMERA_SERVO)
         self.detectLoopThread = self.DetectLoopThread(self)
         self.detectLoopThread.start()
 
@@ -217,7 +224,7 @@ class Car(object):
         self.wheel_front_right.destory()
         self.wheel_back_left.destory()
         self.wheel_back_right.destory()
-        self.camara_servo.destroy()
+        self.camera_servo.destroy()
 
     def destroy(self):
         self.destroyed = True
@@ -234,9 +241,8 @@ class Car(object):
             logging.debug('Exception exit')
 
     def forward(self):
-        self.forwarding = True 
-        self.turningLeft = False
-        self.turningRight = False
+        self.stoped = False
+        self.direction = Direction.forward
         self.wheel_front_left.forward()
         self.wheel_front_right.forward()
         self.wheel_back_left.forward()
@@ -245,9 +251,8 @@ class Car(object):
         self.setTimeout()
 
     def backward(self):
-        self.forwarding = False
-        self.turningLeft = False
-        self.turningRight = False
+        self.stoped = False
+        self.direction = Direction.backward
         self.wheel_front_left.backward()
         self.wheel_front_right.backward()
         self.wheel_back_left.backward()
@@ -256,9 +261,8 @@ class Car(object):
         self.setTimeout()
 
     def left(self):
-        self.forwarding = False
-        self.turningLeft = True
-        self.turningRight = False
+        self.stoped = False
+        self.direction = Direction.left
         self.wheel_front_left.backward()
         self.wheel_front_right.forward()
         self.wheel_back_left.backward()
@@ -267,9 +271,8 @@ class Car(object):
         self.setTimeout()
 
     def right(self):
-        self.forwarding = False
-        self.turningLeft = False
-        self.turningRight = True
+        self.stoped = False
+        self.direction = Direction.right
         self.wheel_front_left.forward()
         self.wheel_front_right.backward()
         self.wheel_back_left.forward()
@@ -280,26 +283,36 @@ class Car(object):
     def setSpeed(self, speed):
         self.speed = speed
         self.updateSpeed()
+    
+    def cameraLeft(self):
+        self.camera_servo.setDegree(self.camera_servo.degree + self.CAMERA_SERVO_DEGRE_DELTA)
+        
+    def cameraRight(self):
+        self.camera_servo.setDegree(self.camera_servo.degree - self.CAMERA_SERVO_DEGRE_DELTA)
         
     def setTimeout(self):
         self.checkTimeout = True
         self.commandTiming = 0
         
     def updateSpeed(self):
-        #currentSpeed = self.speed * 0.5 if self.forwarding else self.speed 
-        currentSpeed = self.speed
+        if not self.stoped:
+            #currentSpeed = self.speed * 0.5 if self.forwarding else self.speed 
+            currentSpeed = self.speed
+        else:
+            currentSpeed = 0
+
         self.wheel_front_left.setSpeed(
-            self.decreeseFactor * currentSpeed if self.turningLeft else currentSpeed)
+            currentSpeed)
         self.wheel_front_right.setSpeed(
-            self.decreeseFactor * currentSpeed if self.turningRight else currentSpeed)
+            currentSpeed)
         self.wheel_back_left.setSpeed(
-            self.decreeseFactor * currentSpeed if self.turningLeft else currentSpeed)
+            currentSpeed)
         self.wheel_back_right.setSpeed(
-            self.decreeseFactor * currentSpeed if self.turningRight else currentSpeed)
+            currentSpeed)
 
     def stop(self):
-        self.turningLeft = False
-        self.turningRight = False
+        self.stoped = True
+        self.direction = Direction.none
         self.wheel_front_left.stop()
         self.wheel_front_right.stop()
         self.wheel_back_left.stop()
